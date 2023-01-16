@@ -36,7 +36,7 @@ const participantSchema = joi.object({
 app.post("/participants", async (req, res) => {
     const participante = req.body;
     const { name } = req.body
-    const validation = participantSchema.validate(participante, {abortEarly: false})
+    const validation = participantSchema.validate({name}, {abortEarly: false})
     
     if (validation.error){
         const erro = validation.error.details.map((detail) => detail.message)
@@ -51,14 +51,7 @@ app.post("/participants", async (req, res) => {
         return 
         }
 
-        if (name === "") {
-            return res.status(422).send({error: "preencher todos os campos"})
-        }
-
-        await db.collection("participants").insertOne({
-            name: participante.name, 
-            lastStatus: Date.now()
-        })
+        await db.collection("participants").insertOne({name, lastStatus: Date.now()})
 
         await db.collection("messages").insertOne({
             from: name,
@@ -71,14 +64,6 @@ app.post("/participants", async (req, res) => {
     } catch (error) {
         res.status(500).send(error.message)
     }
-
-    // const userExist = db.collection("participants").findOne({name})
-     
-    // if(userExist){
-    //     return res.status(409).send({error: "usuário já cadastrado"})
-    // }  
- 
-    // return res.sendStatus(201)
 })
 
 app.get("/participants", async (req, res) => {
@@ -86,8 +71,7 @@ app.get("/participants", async (req, res) => {
     try {
         const user = await db.collection("participants").find().toArray()
         if(!user){
-            res.status(404).send("usuário não logado")
-            return
+            return res.status(404).send("usuário não logado")   
         }
         res.send(user)
     } catch (error) {
@@ -96,39 +80,31 @@ app.get("/participants", async (req, res) => {
 })
 
 app.post("/messages", async (req, res) => {
-    const message = req.body;
-    const { user } = req.headers;
+const { to, text, type } = req.body;
+  const { user } = req.headers;
 
-    const {error} = messageSchema.validate(message);
-    if (error) {
-        return res.sendStatus(422)
-    }
+  const message = {
+    from: user,
+    to,
+    text,
+    type,
+    time: dayjs().format("HH:mm:ss"),
+  };
 
   try {
-    const userExist = await db.collection("participants").findOne({ name: user });
-    if (!userExist) {
-        return res.send(409);
-    }
-    const {to, text, type} = message
-    await db.collection("messages").insertOne({
-        from: user,
-        to,
-        text,
-        type,
-        time: dayjs().format("HH:mm:ss"),
-    })
-    
-    //const validation = messageSchema.validate(message, {abortEarly: false,});
+    const { error } = messageSchema.validate(message, { abortEarly: false });
 
-    /*if (validation.error) {
-      const erro = validation.error.details.map((detail) => detail.message);
-      res.status(422).send(erro);
-      return;
-    }*/
+    if (error) {
+      const errors = error.details.map((detail) => detail.message);
+      return res.status(422).send(errors);
+    }
+
+    await messagesCollection.insertOne(message);
 
     res.sendStatus(201);
-  } catch (error) {
-    res.status(500).send(error.message);
+  } catch (err) {
+    console.log(err);
+    res.sendStatus(500);
   }
 })
 
