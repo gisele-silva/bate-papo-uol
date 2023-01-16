@@ -96,36 +96,37 @@ app.get("/participants", async (req, res) => {
 })
 
 app.post("/messages", async (req, res) => {
-    const { to, text, type } = req.body;
+    const message = req.body;
     const { user } = req.headers;
 
+    const {error} = messageSchema.validate(message);
+    if (error) {
+        return res.sendStatus(422)
+    }
+
   try {
-    const message = {
-      from: user,
-      to,
-      text,
-      type,
-      time: dayjs().format("HH:mm:ss"),
-    };
+    const userExist = await db.collection("participants").findOne({ name: user });
+    if (!userExist) {
+        return res.send(409);
+    }
+    const {to, text, type} = message
+    await db.collection("messages").insertOne({
+        from: user,
+        to,
+        text,
+        type,
+        time: dayjs().format("HH:mm:ss"),
+    })
+    
+    //const validation = messageSchema.validate(message, {abortEarly: false,});
 
-    const validation = messageSchema.validate(message, {abortEarly: false,});
-
-    if (validation.error) {
+    /*if (validation.error) {
       const erro = validation.error.details.map((detail) => detail.message);
       res.status(422).send(erro);
       return;
-    }
+    }*/
 
-    const userExist = await db.collection("participants").findOne({ name: user });
-
-    if (!userExist) {
-      res.send(409);
-      return;
-    }
-
-    await db.collection("messages").insertOne(message);
-
-    res.send(201);
+    res.sendStatus(201);
   } catch (error) {
     res.status(500).send(error.message);
   }
@@ -136,18 +137,19 @@ app.get("/messages", async (req, res) => {
     const {user} = req.headers
 
     try {
-        const mensagem = await db.collection("messages").find().toArray()
-        const buscaMensagem = mensagem.filter((message) => { 
-            const mensagemPrivada = message.to==="todos" || message.to===user || message.from===user
-            const mensagemPublica = message.type === "message"
+        const message = await db.collection("messages").find().toArray()
+        const buscaMessage = message.filter((message) => { 
+            const messagePrivada = message.to==="todos" || message.to===user || message.from===user
+            const messagePublica = message.type === "message"
 
-            return mensagemPrivada || mensagemPublica
+            return messagePrivada || messagePublica
         });
 
-        // if (limit && limit !== NaN){
-        //     return res.send(buscaMensagem.slice(-limit));
-        // }
-        res.send(buscaMensagem.slice(-limit));
+        if (limit && limit !== NaN){
+          return res.send(buscaMessage.slice(-limit));
+        }
+
+        res.send(buscaMessage);
     } catch (error) {
         res.status(500).send(error.message)
     }
@@ -159,8 +161,7 @@ app.post("/status", async (req, res) => {
     try {
         const userExist = await db.collection("participants").findOne({name: user})
         if (!userExist){
-            res.status(404).send("usuário não logado")
-            return 
+            return res.status(404).send("usuário não logado")
         }
 
         await db.collection("participants").updateOne({ name: user }, { $set: { lastStatus: Date.now()}})
@@ -172,20 +173,20 @@ app.post("/status", async (req, res) => {
 
 setInterval(async () => {
     console.log("removendo os inativos")
-    const tempo = Date.now() - 10*1000;
+    const tempo = Date.now() - 10 * 1000
 
     try {
-        const participantesInativos = await db.collection("participants").find({lastStatus: {$lte: tempo}}).toArray()
+        const participantesInativos = await db.collection('participants').find({ lastStatus: { $lte: seconds } }).toArray();
 
         if (participantesInativos.length > 0){
-            const mensagensInativas = participantesInativos.map(participantesInativos => {
+            const mensagensInativas = participantesInativos.map(inactiveParticipant => {
                 return {
-                        from: participantesInativos.name,
-                        to: "Todos",
-                        text: "sai da sala...",
-                        type: "status",
-                        time: dayjs().format("HH:mm:ss")
-                }
+                  from: inactiveParticipant.name,
+                  to: 'Todos',
+                  text: 'sai da sala...',
+                  type: 'status',
+                  time: dayjs().format('HH:mm:ss')
+                };
             })
             await db.collection("messages").insertMany(mensagensInativas)
             await db.collection("participants").deleteMany({lastStatus: {$lte: tempo}})
