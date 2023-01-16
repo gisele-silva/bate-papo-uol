@@ -173,21 +173,21 @@ app.post("/status", async (req, res) => {
 
 setInterval(async () => {
     console.log("removendo os inativos")
-    const tempo = Date.now() - 10 * 1000
+    const tempo = Date.now() - 10*1000;
 
     try {
-        const participantesInativos = await db.collection('participants').find({ lastStatus: { $lte: seconds } }).toArray();
+        const participantesInativos = await db.collection("participants").find({lastStatus: {$lte: tempo}}).toArray()
 
         if (participantesInativos.length > 0){
-            const mensagensInativas = participantesInativos.map(inactiveParticipant => {
+            const mensagensInativas = participantesInativos.map((participant) => {
                 return {
-                  from: inactiveParticipant.name,
-                  to: 'Todos',
-                  text: 'sai da sala...',
-                  type: 'status',
-                  time: dayjs().format('HH:mm:ss')
+                  from: participant.name,
+                  to: "Todos",
+                  text: "sai da sala...",
+                  type: "status",
+                  time: dayjs().format("HH:mm:ss"),
                 };
-            })
+              });
             await db.collection("messages").insertMany(mensagensInativas)
             await db.collection("participants").deleteMany({lastStatus: {$lte: tempo}})
         }
