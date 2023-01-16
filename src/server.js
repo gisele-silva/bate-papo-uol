@@ -25,7 +25,7 @@ const messageSchema = joi.object({
     from: joi.string().required(),
     to: joi.string().min(1).required(),
     text: joi.string().min(1).required(),
-    type: joi.string().valid("message").required(),
+    type: joi.string().valid("message", "private_message").required(),
     time: joi.number()
 })
 
@@ -96,38 +96,39 @@ app.get("/participants", async (req, res) => {
 })
 
 app.post("/messages", async (req, res) => {
-    const {to, text, type} = req.body
-    const { user } = req.headers
+    const { to, text, type } = req.body;
+    const { user } = req.headers;
 
-    try {
-        const message = {
-            from: user,
-            to,
-            text,
-            type,
-            time: dayjs().format("HH:mm:ss")
-        }
+  try {
+    const message = {
+      from: user,
+      to,
+      text,
+      type,
+      time: dayjs().format("HH:mm:ss"),
+    };
 
-          const validation = messageSchema.validate(message, {abortEarly: false,});
+    const validation = messageSchema.validate(message, {abortEarly: false,});
 
-        if (validation.error){
-            const erro = validation.error.details.map((detail) => detail.message)
-            res.status(422).send(erro)
-            return 
-        }
+    if (validation.error) {
+      const erro = validation.error.details.map((detail) => detail.message);
+      res.status(422).send(erro);
+      return;
+    }
 
-        const userExist = await db.collection("participants").findOne({name: user})
+    const userExist = await db.collection("participants").findOne({ name: user });
 
-        if(!userExist){
-            res.sendStatus(409)
-            return
-        }
+    if (!userExist) {
+      res.send(409);
+      return;
+    }
 
-        await db.collection("messages").insertOne(message)
-        res.send(201)
-    } catch (error) {
-        res.status(500).send(error.message)
-    }   
+    await db.collection("messages").insertOne(message);
+
+    res.send(201);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
 })
 
 app.get("/messages", async (req, res) => {
@@ -181,7 +182,7 @@ setInterval(async () => {
                 return {
                         from: participantesInativos.name,
                         to: "Todos",
-                        text: "saiu da sala",
+                        text: "sai da sala...",
                         type: "status",
                         time: dayjs().format("HH:mm:ss")
                 }
