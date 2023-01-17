@@ -26,7 +26,7 @@ const messageSchema = joi.object({
     to: joi.string().min(1).required(),
     text: joi.string().min(1).required(),
     type: joi.string().valid("message", "private_message").required(),
-    time: joi.number()
+    time: joi.string()
 })
 
 const participantSchema = joi.object({
@@ -40,26 +40,25 @@ app.post("/participants", async (req, res) => {
     
     if (validation.error){
         const erro = validation.error.details.map((detail) => detail.message)
-        res.status(422).send(erro)
-        return 
+        return res.status(422).send(erro) 
     }
 
     try {
         const userExist = await db.collection("participants").findOne({name})
         if(userExist){
-        res.status(409).send({error: "usuário já cadastrado"})
-        return 
+            return res.status(409).send({error: "usuário já cadastrado"})
         }
 
         await db.collection("participants").insertOne({name, lastStatus: Date.now()})
 
         await db.collection("messages").insertOne({
             from: name,
-            to: "todos",
+            to: "Todos",
             text: "entra na sala...",
             type: "status",
             time: dayjs().format("HH:mm:ss")
         })
+
         res.sendStatus(201);
     } catch (error) {
         res.status(500).send(error.message)
@@ -95,11 +94,11 @@ const { to, text, type } = req.body;
     const { error } = messageSchema.validate(message, { abortEarly: false });
 
     if (error) {
-      const errors = error.details.map((detail) => detail.message);
-      return res.status(422).send(errors);
+      const erro = error.details.map((detail) => detail.message);
+      return res.status(422).send(erro);
     }
 
-    await messagesCollection.insertOne(message);
+    await db.collection("messages").insertOne(message);
 
     res.sendStatus(201);
   } catch (err) {
